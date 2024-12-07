@@ -6,6 +6,7 @@
 #define MAX_LINE_LENGTH 2000
 #define MAX_FIELD_LENGTH 100
 #define MAX_FIELDS 52
+#define DEFAULT_NUM_ENTRIES 4000
 #define CNTY "County"
 #define ST "State"
 #define EDU_BACH "Education.Bachelor's Degree or Higher"
@@ -26,10 +27,10 @@
 // create county_data struct to store data for each county
 struct county_data
 {
-    char county[50];
-    char state[20];
-    float education[2]; // education[0] = Bachelor's Degree or Higher, education[1] = High School or Higher
-    float ethinicity[8];
+    char county[50];     // County
+    char state[20];      // State
+    float education[2];  // education[0] = Bachelor's Degree or Higher, education[1] = High School or Higher
+    float ethinicity[8]; // Array to hold each ethnicity field
     // ethinicity[0] = Ethnicities.American Indian and Alaska Native Alone
     // ethinicity[1] = Ethnicities.Asian Alone
     // ethinicity[2] = Ethnicities.Black Alone
@@ -38,12 +39,13 @@ struct county_data
     // ethinicity[5] = Ethnicities.Two or More Races
     // ethinicity[6] = Ethnicities.White Alone
     // ethinicity[7] = Ethnicities.White Alone not Hispanic or Latino
-    int med_house_inc;
-    int per_cap_inc;
-    float per_bel_poverty;
-    int population_2014;
+    int med_house_inc;     // Income.Median Household Income
+    int per_cap_inc;       // Income.Per Capita Income
+    float per_bel_poverty; // Income.Persons Below Poverty Level
+    int population_2014;   // Population.2014 Population
 };
 
+// display relevant fields given an entry
 void display(struct county_data entry)
 {
     printf("====================================================\n");
@@ -84,7 +86,6 @@ void parse(char *line, char *fields[MAX_FIELDS])
         // remove quotes then add to fields
         remove_quotes(token);
         fields[count++] = token;
-        // printf("%s\n", token);
 
         token = strtok(NULL, ",");
     }
@@ -103,6 +104,8 @@ void read_demo_file(FILE *fp, struct county_data *data_list)
     // read lines with data
     char buf[MAX_LINE_LENGTH];
     int count = 0; // line number = count + 2
+
+    // read each line and parse
     while (fgets(buf, sizeof(buf), fp))
     {
         char *data_fields[MAX_FIELDS];
@@ -112,6 +115,7 @@ void read_demo_file(FILE *fp, struct county_data *data_list)
         parse(buf, data_fields);
         struct county_data temp;
         int error_found = 0;
+        // look for relevant fields
         for (int i = 0; i < MAX_FIELDS; i++)
         {
             if (strcmp(headers[i], CNTY) == 0)
@@ -199,29 +203,19 @@ void read_demo_file(FILE *fp, struct county_data *data_list)
         data_list[count++] = temp;
     }
     fprintf(stdout, "Loaded %d entries.\n", count);
-    // for (int i = 0; i < count; i++)
-    // {
-    //     print_entry(data_list[i]);
-    // }
 }
 
 void read_ops(FILE *fp, struct county_data *data_list, int list_length)
 {
-    // printf("READING OPS");
     // read the lines in ops file
     char read_buf[MAX_LINE_LENGTH];
     while (fgets(read_buf, sizeof(read_buf), fp))
     {
+        // remove \n from buf
         read_buf[strlen(read_buf) - 1] = '\0';
-        // printf("read buf : %s\n", read_buf);
-        // if (strstr(buf, "filter-state:"))
-        // {
-
-        // }
         if (strcmp(read_buf, "population-total") == 0)
         {
-            // printf("read buf : %s\n", read_buf);
-            printf("population-total\n");
+            // from entries in data_list, add population to total
             int pop_tot = 0;
             for (int i = 0; i < list_length; i++)
             {
@@ -231,8 +225,7 @@ void read_ops(FILE *fp, struct county_data *data_list, int list_length)
         }
         else if (strcmp(read_buf, "display") == 0)
         {
-            // printf("read buf : %s\n", read_buf);
-            printf("display\n");
+            // display each entry in data_list
             for (int i = 0; i < list_length; i++)
             {
                 display(data_list[i]);
@@ -240,38 +233,30 @@ void read_ops(FILE *fp, struct county_data *data_list, int list_length)
         }
         else if (strstr(read_buf, "filter-state:"))
         {
+            // save the state abbreviation to filter
             char *filterstate = (strstr(read_buf, "filter-state:") + 13);
+            // create new array to hold the filtered entries
             struct county_data new_list[list_length];
             int counter = 0;
             for (int i = 0; i < list_length; i++)
             {
-                // printf("Datalist state: %s\n", data_list[i].state);
-                // printf("Datalist county: %s\n", data_list[i].county);
+                // add new entries by filter
                 if (strcmp(data_list[i].state, filterstate) == 0)
                 {
                     new_list[i] = data_list[i];
-                    // printf("Newlist state: %s\n", new_list[i].state);
-                    // printf("Newlist county: %s\n", new_list[i].county);
                     counter++;
                 }
             }
+            // set data_list to new_list
             list_length = counter;
             data_list = new_list;
-            // free(new_list);
-            // data_list = (struct county_data *)realloc(data_list, sizeof(struct county_data) * list_length);
-            // free(new_list);
             printf("Filter: state == %s (%d entries)\n", filterstate, counter);
-            for (int i = 0; i < list_length; i++)
-            {
-                printf("FILTER DATALIST: |%s|\n", data_list[i].county);
-            }
         }
     }
 }
 
 int main(int argc, char const *argv[])
 {
-    // printf("started\n");
     // if both demographics and operations files are not included, exit
     if (argc < 3)
     {
@@ -297,19 +282,21 @@ int main(int argc, char const *argv[])
     }
 
     // allocate memory for array of county_data structs
-    struct county_data *data_list = (struct county_data *)malloc(13 * sizeof(struct county_data));
+    struct county_data *data_list = (struct county_data *)malloc(DEFAULT_NUM_ENTRIES * sizeof(struct county_data));
     if (data_list == NULL)
     {
         printf("Memory not allocated.");
         exit(EXIT_FAILURE);
     }
-    // printf("reading demo file\n");
+    // load entries into program
     read_demo_file(dm_fp, data_list);
-    // printf("BEFORE READ OPS");
-    read_ops(op_fp, data_list, 13);
+    // read and do operations
+    read_ops(op_fp, data_list, DEFAULT_NUM_ENTRIES);
+    // close files
     fclose(dm_fp);
     fclose(op_fp);
+    // free memory
     free(data_list);
-    // printf("finished\n");
+    exit(EXIT_SUCCESS);
     return 0;
 }
